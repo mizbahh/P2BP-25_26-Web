@@ -20,6 +20,13 @@ function optionalInt(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function optionalFloat(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 export const env = {
   port: optionalInt("PORT", 5200),
   nodeEnv: optional("NODE_ENV", "development") as string,
@@ -53,6 +60,23 @@ export const env = {
   mailjetFromName: optional("MAILJET_FROM_NAME", "BetterPlacemaking") as string,
 
   redisUrl: optional("REDIS_URL"),
+
+  // --- Tracking (mirrors appsettings.json "Tracking" section) ---
+  // Tracking data is a filesystem artifact of the offline CV pipeline (CSV of recent
+  // detections + one JSON file per finished track), not a Firestore collection - see
+  // trackingService.ts for the read/parse logic ported from TrackingDataService.cs.
+  trackingPositionsCsv: optional("TRACKING_POSITIONS_CSV", "Data/positions.csv") as string,
+  trackingTracksDir: optional("TRACKING_TRACKS_DIR", "Data/tracks") as string,
+  trackingOffsetX: optionalFloat("TRACKING_OFFSET_X", 0),
+  trackingOffsetY: optionalFloat("TRACKING_OFFSET_Y", 0),
+  trackingOffsetZ: optionalFloat("TRACKING_OFFSET_Z", 0),
+  trackingRotationAngle: optionalFloat("TRACKING_ROTATION_ANGLE", 0),
+  trackingScaleX: optionalFloat("TRACKING_SCALE_X", 1),
+  trackingScaleZ: optionalFloat("TRACKING_SCALE_Z", 1),
+
+  // --- GCS (signed URLs for media upload/download), mirrors appsettings.json "Gcs" section ---
+  gcsBucketName: required("GCS_BUCKET_NAME"),
+  gcsUrlTtlMinutes: optionalInt("GCS_URL_TTL_MINUTES", 10080),
 };
 
 export function refreshTokenHashKey(): string {

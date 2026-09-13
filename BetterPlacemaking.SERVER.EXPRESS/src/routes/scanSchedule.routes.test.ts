@@ -1,0 +1,171 @@
+import { describe, expect, it, vi } from "vitest";
+import express from "express";
+import request from "supertest";
+import { FakeFirestore } from "../test/fakeFirestore.js";
+
+const fake = new FakeFirestore();
+const hasGlobalPermission = vi.fn(async () => false);
+const hasProjectPermission = vi.fn(
+  async (_userId: string, _role: string | undefined, projectId: string) => projectId === "proj-1",
+);
+
+vi.mock("../config/firebase.js", () => ({ getDb: () => fake }));
+vi.mock("../authorization/authorizationService.js", () => ({
+  hasGlobalPermission: (...args: unknown[]) => hasGlobalPermission(...(args as [string, string | undefined, string])),
+  hasProjectPermission: (...args: unknown[]) =>
+    hasProjectPermission(...(args as [string, string | undefined, string, string])),
+  getEffectiveGlobalPermissions: async () => [],
+  getEffectiveProjectPermissions: async () => [],
+  getProjectRoleOptions: async () => [],
+}));
+
+// Not wired into app.ts yet (another migration step mounts it), so the test builds a
+// minimal app around the router directly - same middleware stack app.ts uses.
+const { scanScheduleRouter } = await import("./scanSchedule.routes.js");
+const { errorHandler } = await import("../middleware/errorHandler.js");
+const { createUserToken } = await import("../services/tokenService.js");
+
+function buildApp() {
+  const app = express();
+  app.use(express.json());
+  app.use("/api/scan-schedule", scanScheduleRouter);
+  app.use(errorHandler);
+  return app;
+}
+
+function authHeader(): string {
+  const { token } = createUserToken({ Id: "user-1", Email: "a@b.com", Role: "User" } as never);
+  return `Bearer ${token}`;
+}
+
+describe("POST /api/scan-schedule/:projectId", () => {
+  it("creates a schedule, server-assigning CreatedAt/CreatedByUserId and ignoring client-sent ones", async () => {
+    const app = buildApp();
+    const res = await request(app)
+      .post("/api/scan-schedule/proj-1")
+      .set("Authorization", authHeader())
+      .send({ StartDate: "2026-01-01", StartTime: "09:00", Frequency: "Daily", CreatedByUserId: "attacker" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.Id).toBeTruthy();
+
+    const stored = fake.peek(`projects/proj-1/scan_schedules/${res.body.Id}`);
+    expect(stored?.StartDate).toBe("2026-01-01");
+    expect(stored?.Frequency).toBe("Daily");
+    expect(stored?.CreatedByUserId).toBe("user-1");
+    expect(stored?.CreatedAt).toBeTruthy();
+  });
+
+  it("denies creation when the caller lacks Project.ScanSchedules.Manage on the project", async () => {
+    const app = buildApp();
+    const res = await request(app)
+      .post("/api/scan-schedule/proj-2")
+      .set("Authorization", authHeader())
+      .send({ StartDate: "2026-01-01" });
+
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("GET /api/scan-schedule/:projectId", () => {
+  it("lists the schedules under the project's subcollection", async () => {
+    hasProjectPermission.mockImplementationOnce(async (_u, _r, projectId: string) => projectId === "proj-list");
+    await fake.collection("projects/proj-list/scan_schedules").doc("sched-1").set({
+      StartDate: "2026-02-01",
+      Frequency: "Weekly",
+    });
+
+    const app = buildApp();
+    const res = await request(app).get("/api/scan-schedule/proj-list").set("Authorization", authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].Id).toBe("sched-1");
+    expect(res.body[0].Frequency).toBe("Weekly");
+  });
+
+  it("denies listing when the caller lacks Project.ScanSchedules.Read on the project", async () => {
+    const app = buildApp();
+    const res = await request(app).get("/api/scan-schedule/proj-2").set("Authorization", authHeader());
+
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("DELETE /api/scan-schedule/:projectId/:scheduleId", () => {
+  it("deletes an existing schedule", async () => {
+    await fake.collection("projects/proj-1/scan_schedules").doc("sched-del").set({ Frequency: "Daily" });
+
+    const app = buildApp();
+    const res = await request(app)
+      .delete("/api/scan-schedule/proj-1/sched-del")
+      .set("Authorization", authHeader());
+
+    expect(res.status).toBe(204);
+    expect(fake.peek("projects/proj-1/scan_schedules/sched-del")).toBeUndefined();
+  });
+
+  it("returns 404 for a schedule that does not exist", async () => {
+    const app = buildApp();
+    const res = await request(app)
+      .delete("/api/scan-schedule/proj-1/does-not-exist")
+      .set("Authorization", authHeader());
+
+    expect(res.status).toBe(404);
+  });
+
+  it("denies deletion when the caller lacks Project.ScanSchedules.Manage on the project", async () => {
+    const app = buildApp();
+    const res = await request(app)
+      .delete("/api/scan-schedule/proj-2/sched-1")
+      .set("Authorization", authHeader());
+
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("PUT /api/scan-schedule/:projectId/:scheduleId", () => {
+  it("updates provided fields and always resets EndDate/EndTime, defaulting to empty string when omitted", async () => {
+    await fake.collection("projects/proj-1/scan_schedules").doc("sched-put").set({
+      StartDate: "2026-01-01",
+      StartTime: "09:00",
+      Frequency: "Daily",
+      EndDate: "2026-06-01",
+      EndTime: "17:00",
+    });
+
+    const app = buildApp();
+    const res = await request(app)
+      .put("/api/scan-schedule/proj-1/sched-put")
+      .set("Authorization", authHeader())
+      .send({ Frequency: "Weekly" });
+
+    expect(res.status).toBe(204);
+
+    const stored = fake.peek("projects/proj-1/scan_schedules/sched-put");
+    expect(stored?.Frequency).toBe("Weekly");
+    expect(stored?.StartDate).toBe("2026-01-01");
+    expect(stored?.EndDate).toBe("");
+    expect(stored?.EndTime).toBe("");
+  });
+
+  it("returns 404 for a schedule that does not exist", async () => {
+    const app = buildApp();
+    const res = await request(app)
+      .put("/api/scan-schedule/proj-1/does-not-exist")
+      .set("Authorization", authHeader())
+      .send({ Frequency: "Weekly" });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("denies updates when the caller lacks Project.ScanSchedules.Manage on the project", async () => {
+    const app = buildApp();
+    const res = await request(app)
+      .put("/api/scan-schedule/proj-2/sched-1")
+      .set("Authorization", authHeader())
+      .send({ Frequency: "Weekly" });
+
+    expect(res.status).toBe(403);
+  });
+});

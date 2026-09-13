@@ -48,4 +48,14 @@ describe("app wiring (no Firestore access required)", () => {
     expect(res.status).toBe(200);
     expect(res.body.Success).toBe(true);
   });
+
+  it("rejects unauthenticated requests to project routes", async () => {
+    const res = await request(app).get("/api/project");
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects unauthenticated requests to device routes", async () => {
+    const res = await request(app).get("/api/device/project/some-project");
+    expect(res.status).toBe(401);
+  });
 });

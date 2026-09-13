@@ -9,6 +9,15 @@ import { passwordRouter } from "./routes/password.routes.js";
 import { emailRouter } from "./routes/email.routes.js";
 import { userRouter } from "./routes/user.routes.js";
 import { adminRouter } from "./routes/admin.routes.js";
+import { projectRouter } from "./routes/project.routes.js";
+import { deviceRouter } from "./routes/device.routes.js";
+import { boardLibraryRouter } from "./routes/boardLibrary.routes.js";
+import { floorplanLibraryRouter } from "./routes/floorplanLibrary.routes.js";
+import { trackingRouter } from "./routes/tracking.routes.js";
+import { scanDeviceRouter } from "./routes/scanDevice.routes.js";
+import { scanScheduleRouter } from "./routes/scanSchedule.routes.js";
+import { intrinsicsRouter } from "./routes/intrinsics.routes.js";
+import { cloudStorageRouter } from "./routes/cloudStorage.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 export function createApp() {
@@ -18,7 +27,10 @@ export function createApp() {
   // req.secure / X-Forwarded-* to be trusted, mirroring UseForwardedHeaders.
   app.set("trust proxy", true);
 
-  app.use(express.json());
+  // Default ~100kb body limit is too small for FloorplanLibrary's base64-encoded image
+  // uploads (this server has no multipart parser yet - see floorplanLibrary.routes.ts);
+  // 35mb accommodates the old server's 25MB image cap plus base64/JSON overhead.
+  app.use(express.json({ limit: "35mb" }));
   app.use(cookieParser());
 
   if (env.allowedOrigins.length > 0) {
@@ -39,6 +51,15 @@ export function createApp() {
   app.use("/api/email", emailRouter);
   app.use("/api/user", userRouter);
   app.use("/api/admin", adminRouter);
+  app.use("/api/project", projectRouter);
+  app.use("/api/device", deviceRouter);
+  app.use("/api/board-library", boardLibraryRouter);
+  app.use("/api/floorplan-library", floorplanLibraryRouter);
+  app.use("/api/tracking", trackingRouter);
+  app.use("/api/scan-device", scanDeviceRouter);
+  app.use("/api/scan-schedule", scanScheduleRouter);
+  app.use("/api/intrinsics", intrinsicsRouter);
+  app.use("/api/cloud-storage", cloudStorageRouter);
 
   app.get("/health", (_req, res) => res.status(200).json({ status: "ok" }));
 
