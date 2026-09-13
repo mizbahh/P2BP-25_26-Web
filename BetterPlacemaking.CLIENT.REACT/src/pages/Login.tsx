@@ -114,7 +114,7 @@ export function Login() {
               navigate("/projects", { replace: true });
             }}
           >
-            Dev preview: skip login (no backend needed)
+            Dev preview: skip login (no database)
           </button>
         )}
       </div>
