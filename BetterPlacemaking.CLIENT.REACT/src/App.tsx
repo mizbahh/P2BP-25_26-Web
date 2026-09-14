@@ -19,6 +19,7 @@ import { Fusion } from "./pages/projects/fusion/Fusion";
 import { Puzzle } from "./pages/projects/calibration/Puzzle";
 import { RequirePuzzleReady } from "./routes/RequirePuzzleReady";
 import { MultiLidarCalibration } from "./pages/projects/MultiLidarCalibration";
+import { Scanner } from "./pages/projects/Scanner";
 
 export function App() {
   return (
@@ -100,6 +101,14 @@ export function App() {
               element={
                 <RequirePermission permission={Permissions.Project.Update}>
                   <MultiLidarCalibration />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="model"
+              element={
+                <RequirePermission permission={Permissions.Project.ScansRead}>
+                  <Scanner />
                 </RequirePermission>
               }
             />

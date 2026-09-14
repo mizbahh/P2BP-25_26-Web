@@ -57,3 +57,59 @@ export interface StartScanResult {
   Id: string;
   Status: string | null;
 }
+
+export type ScanPreset = "base" | "medium" | "high";
+
+/** Matches the Angular scan-service's SCAN_PRESETS - the three quality presets offered on the Scanner page. */
+export const SCAN_PRESETS: Record<ScanPreset, ScanSettingsRequest> = {
+  base: {
+    scan_resolution: 8,
+    protocol_mode: "legacy",
+    orientation_mode: "table",
+    output_mode: "filtered_only",
+    split_mode: "none",
+    filter_enabled: false,
+    capture_strategy: "hybrid",
+    min_revolutions_per_slice: 1,
+    force_recalibration: false,
+  },
+  medium: {
+    scan_resolution: 16,
+    protocol_mode: "legacy",
+    orientation_mode: "table",
+    output_mode: "filtered_only",
+    split_mode: "none",
+    filter_enabled: true,
+    capture_strategy: "hybrid",
+    min_revolutions_per_slice: 2,
+    force_recalibration: false,
+  },
+  high: {
+    scan_resolution: 32,
+    protocol_mode: "legacy",
+    orientation_mode: "table",
+    output_mode: "raw_and_filtered",
+    split_mode: "none",
+    filter_enabled: true,
+    capture_strategy: "hybrid",
+    min_revolutions_per_slice: 3,
+    force_recalibration: false,
+  },
+};
+
+/**
+ * Wire shape for `/api/scan-schedule/:projectId[/:scheduleId]` (scanSchedule.routes.ts,
+ * ScanScheduleDto in models/scanSchedule.ts) - CRUD/config only, the actual triggering logic is a
+ * background job runner with no HTTP surface. `LastRunAt` is read back as a raw Firestore
+ * Timestamp (unlike scan.routes.ts's ScanDto, this endpoint does not normalize it to an ISO
+ * string) so it is typed loosely here and handled defensively wherever it's read.
+ */
+export interface ScanScheduleDto {
+  Id?: string;
+  StartDate: string;
+  StartTime: string;
+  Frequency: string;
+  EndDate?: string | null;
+  EndTime?: string | null;
+  LastRunAt?: unknown;
+}
