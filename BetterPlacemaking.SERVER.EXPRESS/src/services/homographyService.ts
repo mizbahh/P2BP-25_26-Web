@@ -810,7 +810,7 @@ export async function saveGlobalHomographies(
 // bird's-eye-view bounding box, warps the image with warpPerspective, and
 // re-encodes/uploads a PNG. This needs a real image-decode/warp/undistort
 // library equivalent to OpenCV (OpenCvSharp in the C# source) - there is no
-# pure-JS/TS equivalent of lens undistortion + perspective warp worth hand
+// pure-JS/TS equivalent of lens undistortion + perspective warp worth hand
 // rolling (this is exactly the kind of "looks plausible but is subtly wrong"
 // risk flagged in the task brief). See the migration report for the two
 // options: a native binding (e.g. `opencv4nodejs`) or a WASM build (e.g.

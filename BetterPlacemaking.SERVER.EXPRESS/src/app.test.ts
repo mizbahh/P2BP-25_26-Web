@@ -58,4 +58,35 @@ describe("app wiring (no Firestore access required)", () => {
     const res = await request(app).get("/api/device/project/some-project");
     expect(res.status).toBe(401);
   });
+
+  // These three routers each existed in src/routes/ for a while WITHOUT being mounted in
+  // app.ts, so every one of their own route tests passed while the real server 404'd the
+  // endpoints. Asserting "not 404" through createApp() is what catches that class of bug;
+  // the specific auth codes are covered in each router's own test file.
+  it("mounts the scan router at /api/scan", async () => {
+    const res = await request(app).get("/api/scan/some-project/some-device");
+    expect(res.status).toBe(401);
+  });
+
+  it("mounts the homography router at /api/homography", async () => {
+    const res = await request(app).get("/api/homography/has-local/some-device");
+    expect(res.status).toBe(401);
+  });
+
+  it("mounts the scan-calibration router at /api/scan-calibration", async () => {
+    // NOTE: 401 is deliberately NOT expected here - ScanCalibrationController carries no
+    // [Authorize] on the old server and is ported that way, so this reaches the handler.
+    // See the security note at the top of scanCalibration.routes.ts.
+    const res = await request(app).post("/api/scan-calibration/p/d/combine").send({ Items: [] });
+    expect(res.status).toBe(400);
+    expect(res.text).toBe("At least two scans are required.");
+  });
+
+  it("does not let /api/scan-device fall through to the /api/scan mount", async () => {
+    // Both are mounted; Express only matches a use() prefix at a "/" boundary, and this
+    // pins that so reordering the mounts cannot silently shadow the hyphenated routes.
+    const res = await request(app).get("/api/scan-device/some-device/next-scan");
+    expect(res.status).toBe(401);
+    expect(res.body.Message).toMatch(/device api key/i);
+  });
 });

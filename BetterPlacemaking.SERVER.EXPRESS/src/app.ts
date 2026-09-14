@@ -16,6 +16,9 @@ import { floorplanLibraryRouter } from "./routes/floorplanLibrary.routes.js";
 import { trackingRouter } from "./routes/tracking.routes.js";
 import { scanDeviceRouter } from "./routes/scanDevice.routes.js";
 import { scanScheduleRouter } from "./routes/scanSchedule.routes.js";
+import { scanRouter } from "./routes/scan.routes.js";
+import { scanCalibrationRouter } from "./routes/scanCalibration.routes.js";
+import { homographyRouter } from "./routes/homography.routes.js";
 import { intrinsicsRouter } from "./routes/intrinsics.routes.js";
 import { cloudStorageRouter } from "./routes/cloudStorage.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -58,7 +61,13 @@ export function createApp() {
   app.use("/api/tracking", trackingRouter);
   app.use("/api/scan-device", scanDeviceRouter);
   app.use("/api/scan-schedule", scanScheduleRouter);
+  // Mounted after the hyphenated scan-* prefixes above: Express only matches a
+  // use() prefix at a "/" boundary, so /api/scan-device never falls through to
+  // this router, but keeping the specific mounts first makes that explicit.
+  app.use("/api/scan-calibration", scanCalibrationRouter);
+  app.use("/api/scan", scanRouter);
   app.use("/api/intrinsics", intrinsicsRouter);
+  app.use("/api/homography", homographyRouter);
   app.use("/api/cloud-storage", cloudStorageRouter);
 
   app.get("/health", (_req, res) => res.status(200).json({ status: "ok" }));

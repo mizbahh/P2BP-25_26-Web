@@ -21,9 +21,16 @@ export function AppLayout() {
                   Admin
                 </Link>
               </HasPermission>
+              <HasPermission permission={Permissions.Global.UsersRead}>
+                <Link to="/admin/users" className="text-neutral-600 hover:text-neutral-900">
+                  Users
+                </Link>
+              </HasPermission>
             </nav>
             <div className="flex items-center gap-3 text-sm">
-              <span className="text-neutral-600">{user?.FirstName ?? user?.Email}</span>
+              <Link to="/user-settings" className="text-neutral-600 hover:text-neutral-900">
+                {user?.FirstName ?? user?.Email}
+              </Link>
               <button
                 onClick={() => void logout()}
                 className="rounded-md border border-neutral-300 px-3 py-1.5 text-neutral-700 hover:bg-neutral-100"

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import zlib from "node:zlib";
 import { Timestamp } from "firebase-admin/firestore";
 import { getDb } from "../config/firebase.js";
 import * as scanDeviceService from "./scanDeviceService.js";
@@ -164,12 +165,20 @@ export function combineClouds(inputs: CombineCloudInput[], outputDirectory: stri
 
     for (const p of transformed) {
       // StreamWriter.WriteLine(...) - double.ToString(InvariantCulture) with no format
-      // string uses .NET's shortest-round-trippable representation, which (for finite,
-      // non-extreme-magnitude values, i.e. real lidar coordinates) matches JS's own
-      // default Number->string conversion (also shortest-round-trippable, '.' decimal
-      // point, no thousands separators). Not verified bit-for-bit at extreme
-      // magnitudes/exponential-notation boundaries, which real point-cloud coordinates
-      // should never approach.
+      // string uses .NET's shortest-round-trippable representation, which for ordinary
+      // finite values matches JS's own default Number->string conversion (also
+      // shortest-round-trippable, '.' decimal point, no thousands separators).
+      //
+      // ONE KNOWN COSMETIC DIFFERENCE: for values that render in exponential notation,
+      // .NET emits a capital 'E' ("6.123233995736766E-17") and JS a lowercase 'e'
+      // ("6.123233995736766e-17"). Both runtimes parse either spelling, and readXyz below
+      // round-trips both, so nothing in this pipeline is affected - but a third-party
+      // consumer of these .xyz files that parses strictly could notice.
+      //
+      // Note this is NOT a rare edge case: manipulatePoints' polar round-trip produces
+      // values like cos(pi/2) = 6.12e-17 whenever a point lands on an axis, which happens
+      // routinely - including at theta = 0. See the regression tests in
+      // scanCalibration.routes.test.ts.
       lines.push(`${p.X} ${p.Y} ${p.Z}`);
     }
   }
@@ -182,11 +191,10 @@ export function combineClouds(inputs: CombineCloudInput[], outputDirectory: stri
 
 /**
  * Mirrors ScanFlattenPreviewService.RenderPreviewPng's point extraction/filtering loop
- * ONLY (file-existence check, per-line parse, Z-threshold filter, running max XY
- * distance) - NOT the Plotter.Render rasterization step, which is not ported (see the
- * big comment in scanCalibration.routes.ts's preview handler for why). Throws the same
- * InvalidOperationException-equivalent as the source when no valid point survives
- * filtering.
+ * (file-existence check, per-line parse, Z-threshold filter, running max XY distance).
+ * The Plotter.Render rasterization step that consumes this is renderPreviewPng below.
+ * Throws the same InvalidOperationException-equivalent as the source when no valid
+ * point survives filtering.
  */
 export function buildPreviewPoints(xyzFilePath: string, threshold = -2.75, useThreshold = true): { points: PreviewPoint[]; maxDistance: number } {
   if (!fs.existsSync(xyzFilePath)) {
@@ -219,6 +227,160 @@ export function buildPreviewPoints(xyzFilePath: string, threshold = -2.75, useTh
   }
 
   return { points, maxDistance };
+}
+
+// ===========================================================================
+// Plotter.Render port (Services/ScanCombine/Plotter.cs).
+//
+// The C# original rasterizes with SkiaSharp. Rather than take a native image
+// dependency, this hand-rolls the same drawing into an RGBA buffer and encodes
+// a PNG with Node's built-in zlib - the same "no native image libraries"
+// approach floorplanLibraryService.ts already uses for image headers.
+//
+// Exactly equivalent: canvas geometry (worldPixels 1280, padding 20 => 1320x1320),
+// the scale factor, the y-flipped world->pixel mapping, the transparent
+// background, the colors, and the per-point draw ORDER (fill then outline for
+// each point in turn, so a later point's fill can overwrite an earlier point's
+// outline - matching the C# loop).
+//
+// DELIBERATE DEVIATION: Skia draws with IsAntialias = true; this rasterizer is
+// hard-edged. Circle edges differ by a sub-pixel alpha ramp, so output is NOT
+// byte-identical to the C# PNG. This is a debug preview image of a point cloud,
+// not a geometric result - no coordinate, scale, or position differs. Flagged
+// rather than hidden.
+// ===========================================================================
+
+const PREVIEW_WORLD_PIXELS = 1280;
+const PREVIEW_PADDING = 20;
+const PREVIEW_POINT_RADIUS = 4;
+
+let crcTable: Uint32Array | null = null;
+
+function crc32(buf: Buffer): number {
+  if (!crcTable) {
+    crcTable = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      crcTable[n] = c >>> 0;
+    }
+  }
+  let crc = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) crc = crcTable[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length, 0);
+  const typeAndData = Buffer.concat([Buffer.from(type, "ascii"), data]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(typeAndData), 0);
+  return Buffer.concat([length, typeAndData, crc]);
+}
+
+/** Encodes an RGBA pixel buffer as a PNG (8-bit, colour type 6, no interlace). */
+function encodePng(rgba: Buffer, width: number, height: number): Buffer {
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 6; // colour type: truecolour with alpha
+  ihdr[10] = 0; // compression: deflate
+  ihdr[11] = 0; // filter method
+  ihdr[12] = 0; // interlace: none
+
+  // Each scanline is prefixed with filter type 0 (None).
+  const stride = width * 4;
+  const raw = Buffer.alloc(height * (stride + 1));
+  for (let y = 0; y < height; y++) {
+    raw[y * (stride + 1)] = 0;
+    rgba.copy(raw, y * (stride + 1) + 1, y * stride, y * stride + stride);
+  }
+
+  return Buffer.concat([
+    signature,
+    pngChunk("IHDR", ihdr),
+    pngChunk("IDAT", zlib.deflateSync(raw)),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+/**
+ * Mirrors Plotter.Render. `maxDistance` must be positive, matching the source's
+ * ArgumentOutOfRangeException guard.
+ */
+export function renderPreviewPng(points: PreviewPoint[], maxDistance: number): Buffer {
+  if (!(maxDistance > 0)) {
+    throw new ScanCalibrationValidationError("maxDistance must be positive.");
+  }
+
+  const scale = PREVIEW_WORLD_PIXELS / (2.0 * maxDistance);
+  const canvasSize = PREVIEW_WORLD_PIXELS + PREVIEW_PADDING * 2;
+  const cx = canvasSize / 2.0;
+  const cy = canvasSize / 2.0;
+
+  // Transparent background (SKColors.Transparent), premultiplied alpha - all-zero.
+  const rgba = Buffer.alloc(canvasSize * canvasSize * 4);
+
+  const fillR = 0;
+  const fillG = 0;
+  const fillB = 255; // SKColors.Blue
+  const outline = 255; // SKColors.White, r = g = b
+
+  const r = PREVIEW_POINT_RADIUS;
+  // Skia's 1px stroke is centred on the radius-4 path, so it covers 3.5..4.5.
+  const strokeInner = r - 0.5;
+  const strokeOuter = r + 0.5;
+  const reach = Math.ceil(strokeOuter);
+
+  const setPixel = (x: number, y: number, red: number, green: number, blue: number): void => {
+    const o = (y * canvasSize + x) * 4;
+    rgba[o] = red;
+    rgba[o + 1] = green;
+    rgba[o + 2] = blue;
+    rgba[o + 3] = 255;
+  };
+
+  for (const pt of points) {
+    // ToPixel: y is flipped, matching `cy - wy * scale` in the source.
+    const px = cx + pt.x * scale;
+    const py = cy - pt.y * scale;
+
+    const minX = Math.max(0, Math.floor(px - reach));
+    const maxX = Math.min(canvasSize - 1, Math.ceil(px + reach));
+    const minY = Math.max(0, Math.floor(py - reach));
+    const maxY = Math.min(canvasSize - 1, Math.ceil(py + reach));
+
+    // Fill pass, then outline pass - same order as the two DrawCircle calls.
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const dx = x + 0.5 - px;
+        const dy = y + 0.5 - py;
+        if (dx * dx + dy * dy <= r * r) setPixel(x, y, fillR, fillG, fillB);
+      }
+    }
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const dx = x + 0.5 - px;
+        const dy = y + 0.5 - py;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= strokeInner * strokeInner && d2 <= strokeOuter * strokeOuter) {
+          setPixel(x, y, outline, outline, outline);
+        }
+      }
+    }
+  }
+
+  return encodePng(rgba, canvasSize, canvasSize);
+}
+
+/** Mirrors ScanFlattenPreviewService.RenderPreviewPng end to end. */
+export function renderPreviewPngFromFile(xyzFilePath: string, threshold = -2.75, useThreshold = true): Buffer {
+  const { points, maxDistance } = buildPreviewPoints(xyzFilePath, threshold, useThreshold);
+  return renderPreviewPng(points, maxDistance);
 }
 
 /**

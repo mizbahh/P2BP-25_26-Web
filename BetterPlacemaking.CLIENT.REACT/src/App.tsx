@@ -9,7 +9,10 @@ import { ResetPassword } from "./pages/ResetPassword";
 import { SelectProject } from "./pages/projects/SelectProject";
 import { ProjectsList } from "./pages/projects/ProjectsList";
 import { ProjectWorkspace } from "./pages/projects/ProjectWorkspace";
+import { ProjectPermissions } from "./pages/projects/ProjectPermissions";
 import { DevicesList } from "./pages/devices/DevicesList";
+import { PermissionsList } from "./pages/admin/PermissionsList";
+import { UserSettings } from "./pages/UserSettings";
 
 export function App() {
   return (
@@ -21,6 +24,9 @@ export function App() {
 
         <Route element={<AppLayout />}>
           <Route path="/projects" element={<SelectProject />} />
+          {/* Mirrors the Angular route table's `user-settings` - no permission guard, any
+              signed-in user manages their own profile/password/notifications. */}
+          <Route path="/user-settings" element={<UserSettings />} />
           <Route
             path="/admin/projects"
             element={
@@ -29,6 +35,17 @@ export function App() {
               </RequirePermission>
             }
           />
+          <Route
+            path="/admin/users"
+            element={
+              <RequirePermission scope="global" permission={Permissions.Global.UsersRead}>
+                <PermissionsList />
+              </RequirePermission>
+            }
+          />
+          {/* The Angular table keeps `admin/permissions` as a redirect to `admin/users`;
+              preserved so existing links/bookmarks keep working. */}
+          <Route path="/admin/permissions" element={<Navigate to="/admin/users" replace />} />
           <Route
             path="/:projectId"
             element={
@@ -42,6 +59,25 @@ export function App() {
               element={
                 <RequirePermission scope="global" permission={Permissions.Global.ProjectsReadAll}>
                   <ProjectsList />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="admin/users"
+              element={
+                <RequirePermission scope="global" permission={Permissions.Global.UsersRead}>
+                  <PermissionsList />
+                </RequirePermission>
+              }
+            />
+            {/* Project-scoped member/role management. Note this path is `admin/permissions`
+                under a :projectId, whereas the top-level `/admin/permissions` redirects to
+                the global user list - same split as the Angular route table. */}
+            <Route
+              path="admin/permissions"
+              element={
+                <RequirePermission permission={Permissions.Project.MembersAssignEditorViewer}>
+                  <ProjectPermissions />
                 </RequirePermission>
               }
             />
