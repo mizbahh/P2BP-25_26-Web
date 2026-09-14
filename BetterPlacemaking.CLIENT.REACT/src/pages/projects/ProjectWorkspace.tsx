@@ -5,10 +5,7 @@ import { Permissions } from "../../lib/permissions";
 import * as projectApi from "../../services/projectApi";
 import type { ProjectDto } from "../../lib/projectTypes";
 
-/**
- * Minimal project-workspace shell - title + nav to Devices/Admin. Later phases
- * (Dashboard, Vision, Fusion) slot their routes in here alongside Devices.
- */
+/** Project-workspace shell - title + nav to every project-scoped page. */
 export function ProjectWorkspace() {
   const { projectId } = useParams();
   const [project, setProject] = useState<ProjectDto | null>(null);
@@ -29,10 +26,41 @@ export function ProjectWorkspace() {
         </div>
       </div>
 
-      <nav className="mt-4 flex gap-4 border-b border-neutral-200 text-sm">
+      <nav className="mt-4 flex flex-wrap gap-4 border-b border-neutral-200 text-sm">
+        <Link to={`/${projectId}/dashboard`} className="border-b-2 border-transparent pb-2 hover:border-indigo-500">
+          Dashboard
+        </Link>
+        <HasPermission permission={Permissions.Project.ScansRead} projectId={projectId}>
+          <Link to={`/${projectId}/model`} className="border-b-2 border-transparent pb-2 hover:border-indigo-500">
+            3D Model
+          </Link>
+        </HasPermission>
+        <HasPermission permission={Permissions.Project.VisionRead} projectId={projectId}>
+          <Link to={`/${projectId}/vision`} className="border-b-2 border-transparent pb-2 hover:border-indigo-500">
+            Vision
+          </Link>
+        </HasPermission>
+        <HasPermission permission={Permissions.Project.ScansRead} projectId={projectId}>
+          <Link to={`/${projectId}/fusion`} className="border-b-2 border-transparent pb-2 hover:border-indigo-500">
+            Fusion
+          </Link>
+        </HasPermission>
         <HasPermission permission={Permissions.Project.DevicesRead} projectId={projectId}>
           <Link to={`/${projectId}/devices`} className="border-b-2 border-transparent pb-2 hover:border-indigo-500">
             Devices
+          </Link>
+        </HasPermission>
+        <HasPermission permission={Permissions.Project.MembersAssignEditorViewer} projectId={projectId}>
+          <Link
+            to={`/${projectId}/admin/permissions`}
+            className="border-b-2 border-transparent pb-2 hover:border-indigo-500"
+          >
+            Permissions
+          </Link>
+        </HasPermission>
+        <HasPermission permission={Permissions.Global.UsersRead}>
+          <Link to={`/${projectId}/admin/users`} className="border-b-2 border-transparent pb-2 hover:border-indigo-500">
+            Users
           </Link>
         </HasPermission>
         <HasPermission permission={Permissions.Global.ProjectsReadAll}>
@@ -40,7 +68,7 @@ export function ProjectWorkspace() {
             to={`/${projectId}/admin/projects`}
             className="border-b-2 border-transparent pb-2 hover:border-indigo-500"
           >
-            Admin
+            Manage Projects
           </Link>
         </HasPermission>
       </nav>
