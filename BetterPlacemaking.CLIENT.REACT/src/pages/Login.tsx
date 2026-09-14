@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { _devPreviewLogin } from "../auth/authStore";
 import { sanitizeReturnUrl } from "../routes/sanitizeReturnUrl";
 
 export function Login() {
@@ -105,18 +104,6 @@ export function Login() {
           {isSignup ? "Already have an account? Sign in" : "Need an account? Sign up"}
         </button>
 
-        {import.meta.env.DEV && (
-          <button
-            type="button"
-            className="mt-6 w-full rounded-md border border-dashed border-amber-400 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100"
-            onClick={() => {
-              _devPreviewLogin();
-              navigate("/projects", { replace: true });
-            }}
-          >
-            Dev preview: skip login (no database)
-          </button>
-        )}
       </div>
     </div>
   );

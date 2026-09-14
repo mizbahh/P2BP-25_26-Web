@@ -107,21 +107,6 @@ export function clearState(): void {
   notify();
 }
 
-/**
- * Dev-only escape hatch: fakes a logged-in session without hitting the API, so
- * the post-login UI can be previewed before a real backend/Firestore is wired up.
- * Only ever called from a button gated on import.meta.env.DEV - never shipped.
- */
-export function _devPreviewLogin(): void {
-  current = {
-    Token: "preview-token",
-    ExpiresAtUtc: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-    User: { Id: "preview-user", FirstName: "Preview", LastName: "User", Email: "preview@example.com" },
-  };
-  persist(current);
-  notify();
-}
-
 export function setProfileNames(firstName: string, lastName: string): void {
   if (!current) return;
   current = { ...current, User: { ...current.User, FirstName: firstName, LastName: lastName } };

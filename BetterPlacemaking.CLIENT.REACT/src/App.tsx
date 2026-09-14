@@ -13,6 +13,12 @@ import { ProjectPermissions } from "./pages/projects/ProjectPermissions";
 import { DevicesList } from "./pages/devices/DevicesList";
 import { PermissionsList } from "./pages/admin/PermissionsList";
 import { UserSettings } from "./pages/UserSettings";
+import { Dashboard } from "./pages/projects/Dashboard";
+import { Vision } from "./pages/projects/vision/Vision";
+import { Fusion } from "./pages/projects/fusion/Fusion";
+import { Puzzle } from "./pages/projects/calibration/Puzzle";
+import { RequirePuzzleReady } from "./routes/RequirePuzzleReady";
+import { MultiLidarCalibration } from "./pages/projects/MultiLidarCalibration";
 
 export function App() {
   return (
@@ -54,6 +60,49 @@ export function App() {
               </RequirePermission>
             }
           >
+            <Route index element={<Dashboard />} />
+            <Route
+              path="dashboard"
+              element={
+                <RequirePermission permission={Permissions.Project.Read}>
+                  <Dashboard />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="vision"
+              element={
+                <RequirePermission permission={Permissions.Project.VisionRead}>
+                  <Vision />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="fusion"
+              element={
+                <RequirePermission permission={Permissions.Project.ScansRead}>
+                  <Fusion />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="calibration/puzzle"
+              element={
+                <RequirePermission permission={Permissions.Project.VisionRead}>
+                  <RequirePuzzleReady>
+                    <Puzzle />
+                  </RequirePuzzleReady>
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="lidar-calibration"
+              element={
+                <RequirePermission permission={Permissions.Project.Update}>
+                  <MultiLidarCalibration />
+                </RequirePermission>
+              }
+            />
             <Route
               path="admin/projects"
               element={
