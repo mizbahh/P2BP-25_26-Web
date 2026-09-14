@@ -21,6 +21,9 @@ import { scanCalibrationRouter } from "./routes/scanCalibration.routes.js";
 import { homographyRouter } from "./routes/homography.routes.js";
 import { intrinsicsRouter } from "./routes/intrinsics.routes.js";
 import { cloudStorageRouter } from "./routes/cloudStorage.routes.js";
+import { rplidarRouter } from "./routes/rplidar.routes.js";
+import { fusionRouter } from "./routes/fusion.routes.js";
+import { visualizerRouter } from "./routes/visualizer.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 export function createApp() {
@@ -69,6 +72,9 @@ export function createApp() {
   app.use("/api/intrinsics", intrinsicsRouter);
   app.use("/api/homography", homographyRouter);
   app.use("/api/cloud-storage", cloudStorageRouter);
+  app.use("/api/rplidar", rplidarRouter);
+  app.use("/api/fusion", fusionRouter);
+  app.use("/api/visualizer", visualizerRouter);
 
   app.get("/health", (_req, res) => res.status(200).json({ status: "ok" }));
 

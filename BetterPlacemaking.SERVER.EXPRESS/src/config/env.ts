@@ -77,6 +77,23 @@ export const env = {
   // --- GCS (signed URLs for media upload/download), mirrors appsettings.json "Gcs" section ---
   gcsBucketName: required("GCS_BUCKET_NAME"),
   gcsUrlTtlMinutes: optionalInt("GCS_URL_TTL_MINUTES", 10080),
+
+  // --- RplidarScan (mirrors appsettings.json "RplidarScan" section) ---
+  // Raw .xyz scan files live on disk under this directory (a filesystem artifact,
+  // like Tracking:* above, not a Firestore collection) - see rplidarService.ts for
+  // the parse/classify/cluster logic ported from RplidarScanService.cs. The
+  // threshold/margin values are physical calibration constants (meters, relative
+  // to the RPLidar's ceiling-mount height) - see rplidarService.ts for what each
+  // one means; defaults here are copied verbatim from appsettings.json.
+  rplidarScanDirectory: optional("RPLIDAR_SCAN_DIRECTORY", "Data/rplidar_scans") as string,
+  rplidarFloorThreshold: optionalFloat("RPLIDAR_FLOOR_THRESHOLD", -4.3),
+  rplidarCeilingThreshold: optionalFloat("RPLIDAR_CEILING_THRESHOLD", -1.0),
+  rplidarClusterGridSize: optionalFloat("RPLIDAR_CLUSTER_GRID_SIZE", 0.4),
+  rplidarMinClusterPoints: optionalInt("RPLIDAR_MIN_CLUSTER_POINTS", 10),
+  rplidarWallMargin: optionalFloat("RPLIDAR_WALL_MARGIN", 0.8),
+  rplidarScannerExclusionRadius: optionalFloat("RPLIDAR_SCANNER_EXCLUSION_RADIUS", 2.0),
+  rplidarGroundContactMargin: optionalFloat("RPLIDAR_GROUND_CONTACT_MARGIN", 0.9),
+  rplidarMaxObstacleDimension: optionalFloat("RPLIDAR_MAX_OBSTACLE_DIMENSION", 5.0),
 };
 
 export function refreshTokenHashKey(): string {
