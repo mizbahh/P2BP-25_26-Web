@@ -1,63 +1,69 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { API_BASE_URL } from "../lib/env";
+import { Button, Card, InputText, Message } from "../components/prime";
 
 const GENERIC_MESSAGE = "If an account exists for that email, a password reset link has been sent.";
 
 export function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    setSuccessMessage("");
+    setErrorMessage("");
+
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setErrorMessage("Email is required.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       await fetch(`${API_BASE_URL}/api/password/request-reset`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: trimmed }),
       });
+    } catch {
+      /* same message either way, as the original */
     } finally {
-      // Deliberately identical message on success or failure - avoids leaking whether an email exists.
       setSubmitting(false);
-      setMessage(GENERIC_MESSAGE);
+      setSuccessMessage(GENERIC_MESSAGE);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
-      <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-6 text-xl font-semibold text-neutral-900">Reset your password</h1>
+    <div className="min-h-screen w-full flex items-center justify-center surface-ground p-4">
+      <Card
+        className="w-full max-w-md content-background"
+        titleTemplate={
+          <div className="text-center">
+            <div className="text-xl font-semibold">Forgot Password</div>
+            <div className="text-sm text-surface-500">Request a reset link by email</div>
+          </div>
+        }
+      >
+        <form noValidate className="flex flex-col gap-4" onSubmit={submit}>
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium" htmlFor="forgot-email">Email</label>
+            <InputText id="forgot-email" type="email" autoComplete="email" name="email" className="w-full" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
 
-        {message ? (
-          <p className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-700">{message}</p>
-        ) : (
-          <form className="space-y-4" onSubmit={submit}>
-            <label className="block text-sm font-medium text-neutral-700">
-              Email
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-indigo-500 focus:outline-none"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
-            >
-              {submitting ? "Sending…" : "Send reset link"}
-            </button>
-          </form>
-        )}
+          <Button type="submit" label="Send Reset Link" loading={submitting} disabled={submitting} className="w-full" />
 
-        <Link to="/login" className="mt-4 block text-center text-sm text-indigo-600 hover:underline">
-          Back to sign in
-        </Link>
-      </div>
+          {successMessage && <Message severity="success" text={successMessage} />}
+          {errorMessage && <Message severity="error" text={errorMessage} />}
+
+          <div className="text-center text-sm">
+            <Link to="/login" className="underline">Back to sign in</Link>
+          </div>
+        </form>
+      </Card>
     </div>
   );
 }

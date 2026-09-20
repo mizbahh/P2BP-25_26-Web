@@ -1,42 +1,57 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { sanitizeReturnUrl } from "../routes/sanitizeReturnUrl";
+import { Button, Card, InputText, Password, useToast } from "../components/prime";
+import { toggleDarkMode, useIsDark } from "../theme/themeService";
+
+// Angular's Validators.email pattern.
+const EMAIL_RE =
+  /^(?=.{1,254}$)(?=.{1,64}@)[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
 export function Login() {
   const { login, register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
+  const isDark = useIsDark();
   const [searchParams] = useSearchParams();
   const returnUrl = sanitizeReturnUrl(searchParams.get("returnUrl"));
 
   const [isSignup, setIsSignup] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const touch = (...names: string[]) => setTouched((t) => ({ ...t, ...Object.fromEntries(names.map((n) => [n, true])) }));
 
   useEffect(() => {
     if (isAuthenticated) navigate(returnUrl ?? "/projects", { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
+  const emailInvalid = !email || !EMAIL_RE.test(email);
+  const passwordInvalid = !password;
+
+  function showError(detail: string) {
+    toast.add({ severity: "error", summary: "Error", detail, life: 6000 });
+  }
+
   async function submitLogin(e: FormEvent) {
     e.preventDefault();
-    setError(null);
+    if (emailInvalid || passwordInvalid) {
+      touch("login-email", "login-password");
+      return;
+    }
     setSubmitting(true);
     try {
       const resp = await login(email, password);
-      if (!resp.Success) {
-        setError(resp.Message ?? "Login failed");
-        return;
-      }
+      if (!resp.Success) return;
       navigate(returnUrl ?? "/projects", { replace: true });
     } catch {
-      setError("Login failed");
+      showError("Login failed");
     } finally {
       setSubmitting(false);
     }
@@ -44,106 +59,122 @@ export function Login() {
 
   async function submitSignup(e: FormEvent) {
     e.preventDefault();
-    setError(null);
+    if (!firstName || !lastName || emailInvalid || passwordInvalid) {
+      touch("signup-email", "signup-password");
+      return;
+    }
     setSubmitting(true);
     try {
       const resp = await register(firstName, lastName, email, password);
       if (!resp.Success) {
-        setError(resp.Message ?? "Signup failed");
+        showError("Signup failed");
         return;
       }
       setIsSignup(false);
-      setInfo("Account created. Check your email to verify it before logging in.");
     } catch {
-      setError("Signup failed");
+      showError("Signup failed");
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
-      <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-6 text-xl font-semibold text-neutral-900">
-          {isSignup ? "Create your account" : "Sign in to BetterPlacemaking"}
-        </h1>
+    <div className="min-h-screen w-full flex items-center justify-center surface-ground p-4">
+      <Card
+        className="w-full max-w-md content-background"
+        titleTemplate={
+          <div className="text-center">
+            <div className="text-xl font-semibold">Better Placemaking</div>
+            <div className="text-sm text-surface-500">{isSignup ? "Create an account" : "Sign in"}</div>
+          </div>
+        }
+      >
+        {!isSignup ? (
+          <form noValidate onSubmit={submitLogin} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium" htmlFor="login-email">Email</label>
+              <InputText
+                id="login-email"
+                type="email"
+                autoComplete="email"
+                className="w-full"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => touch("login-email")}
+              />
+              {touched["login-email"] && emailInvalid && <div className="text-xs text-red-600">Enter a valid email.</div>}
+            </div>
 
-        {info && <p className="mb-4 rounded-md bg-emerald-50 p-3 text-sm text-emerald-700">{info}</p>}
-        {error && <p className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium" htmlFor="login-password">Password</label>
+              <Password
+                inputId="login-password"
+                value={password}
+                onChange={setPassword}
+                onBlur={() => touch("login-password")}
+                feedback={false}
+                toggleMask
+                className="w-full"
+                inputStyleClass="w-full"
+              />
+              {touched["login-password"] && passwordInvalid && <div className="text-xs text-red-600">Password is required.</div>}
+            </div>
 
-        {isSignup ? (
-          <form className="space-y-4" onSubmit={submitSignup}>
-            <Field label="First name" value={firstName} onChange={setFirstName} required />
-            <Field label="Last name" value={lastName} onChange={setLastName} required />
-            <Field label="Email" type="email" value={email} onChange={setEmail} required />
-            <Field label="Password" type="password" value={password} onChange={setPassword} required />
-            <SubmitButton submitting={submitting} label="Sign up" />
+            <Button type="submit" label="Sign in" loading={submitting} disabled={submitting} className="w-full" />
+
+            <div className="text-center text-sm">
+              <Button type="button" severity="secondary" variant="text" label="Create an account" link className="p-0" onClick={() => setIsSignup(true)} />
+            </div>
           </form>
         ) : (
-          <form className="space-y-4" onSubmit={submitLogin}>
-            <Field label="Email" type="email" value={email} onChange={setEmail} required />
-            <Field label="Password" type="password" value={password} onChange={setPassword} required />
-            <div className="text-right">
-              <Link to="/forgot-password" className="text-sm text-indigo-600 hover:underline">
-                Forgot password?
-              </Link>
+          <form noValidate onSubmit={submitSignup} className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium" htmlFor="signup-first">First name</label>
+                <InputText id="signup-first" type="text" className="w-full" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium" htmlFor="signup-last">Last name</label>
+                <InputText id="signup-last" type="text" className="w-full" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+              </div>
             </div>
-            <SubmitButton submitting={submitting} label="Sign in" />
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium" htmlFor="signup-email">Email</label>
+              <InputText
+                id="signup-email"
+                type="email"
+                autoComplete="email"
+                className="w-full"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => touch("signup-email")}
+              />
+              {touched["signup-email"] && emailInvalid && <div className="text-xs text-red-600">Enter a valid email.</div>}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium" htmlFor="signup-password">Password</label>
+              <Password inputId="signup-password" value={password} onChange={setPassword} feedback={false} toggleMask className="w-full" inputStyleClass="w-full" />
+            </div>
+
+            <Button type="submit" label="Create account" loading={submitting} disabled={submitting} className="w-full" />
+
+            <div className="text-center text-sm">
+              <Button type="button" severity="secondary" variant="text" label="Back to sign in" className="p-0" onClick={() => setIsSignup(false)} />
+            </div>
           </form>
         )}
+      </Card>
 
-        <button
-          type="button"
-          className="mt-4 w-full text-center text-sm text-neutral-600 hover:underline"
-          onClick={() => {
-            setError(null);
-            setInfo(null);
-            setIsSignup((v) => !v);
-          }}
-        >
-          {isSignup ? "Already have an account? Sign in" : "Need an account? Sign up"}
-        </button>
-
-      </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-  required,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  required?: boolean;
-}) {
-  return (
-    <label className="block text-sm font-medium text-neutral-700">
-      {label}
-      <input
-        type={type}
-        required={required}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-indigo-500 focus:outline-none"
+      <Button
+        icon={isDark ? "pi pi-sun" : "pi pi-moon"}
+        rounded
+        text
+        severity="secondary"
+        onClick={toggleDarkMode}
+        hostClassName="fixed bottom-4 right-4"
       />
-    </label>
-  );
-}
-
-function SubmitButton({ submitting, label }: { submitting: boolean; label: string }) {
-  return (
-    <button
-      type="submit"
-      disabled={submitting}
-      className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
-    >
-      {submitting ? "Please wait…" : label}
-    </button>
+    </div>
   );
 }

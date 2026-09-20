@@ -1,80 +1,59 @@
 import { useState, type FormEvent } from "react";
-import { Modal } from "../../components/Modal";
+import { Button, InputText, Panel, type DynamicDialogComponentProps } from "../../components/prime";
 import type { ProjectDto } from "../../lib/projectTypes";
-import type { ProjectInput } from "../../services/projectApi";
 
-interface ProjectFormProps {
-  project?: ProjectDto;
-  onSave: (input: ProjectInput) => void;
-  onClose: () => void;
-}
+/** Opened through useDialogService().open(ProjectForm, { data: project }) - mirrors the Angular DynamicDialog form. */
+export function ProjectForm({ data, dialogRef }: DynamicDialogComponentProps<ProjectDto | undefined, ProjectDto>) {
+  const existing = data;
+  const [title, setTitle] = useState(existing?.Title ?? "");
+  const [description, setDescription] = useState(existing?.Description ?? "");
+  const [location, setLocation] = useState(existing?.Location ?? "");
+  const invalid = title === "";
 
-export function ProjectForm({ project, onSave, onClose }: ProjectFormProps) {
-  const [title, setTitle] = useState(project?.Title ?? "");
-  const [description, setDescription] = useState(project?.Description ?? "");
-  const [location, setLocation] = useState(project?.Location ?? "");
-
-  function submit(e: FormEvent) {
+  function onSubmit(e: FormEvent) {
     e.preventDefault();
-    onSave({ Title: title, Description: description, Location: location });
+    if (invalid) return;
+    dialogRef.close({
+      ...existing,
+      Id: existing?.Id ?? "",
+      Title: title,
+      Description: description,
+      Location: location,
+    } as ProjectDto);
   }
 
   return (
-    <Modal title={project ? "Edit Project" : "Add Project"} onClose={onClose}>
-      <form className="space-y-4" onSubmit={submit}>
-        {project?.Id && (
-          <label className="block text-sm font-medium text-neutral-700">
-            Id
-            <input
-              disabled
-              value={project.Id}
-              className="mt-1 w-full rounded-md border border-neutral-200 bg-neutral-100 px-3 py-2 text-sm text-neutral-500"
-            />
-          </label>
-        )}
-        <label className="block text-sm font-medium text-neutral-700">
-          Title
-          <input
-            required
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-indigo-500 focus:outline-none"
-          />
-        </label>
-        <label className="block text-sm font-medium text-neutral-700">
-          Description
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-indigo-500 focus:outline-none"
-          />
-        </label>
-        <label className="block text-sm font-medium text-neutral-700">
-          Location
-          <input
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-indigo-500 focus:outline-none"
-          />
-        </label>
-        <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={!title.trim()}
-            className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
-          >
-            Save
-          </button>
+    <form onSubmit={onSubmit} className="p-fluid flex flex-col gap-4 p-4">
+      <Panel header="Project Details">
+        <div className="grid gap-4 md:grid-cols-2">
+          {existing?.Id ? (
+            <div className="flex flex-col gap-1 md:col-span-2">
+              <label htmlFor="project-id" className="font-semibold">Id</label>
+              <InputText id="project-id" disabled value={existing.Id} readOnly />
+            </div>
+          ) : null}
+
+          <div className="flex flex-col gap-1 md:col-span-2">
+            <label htmlFor="project-title" className="font-semibold">Title</label>
+            <InputText id="project-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
+
+          <div className="flex flex-col gap-1 md:col-span-2">
+            <label htmlFor="project-description" className="font-semibold">Description</label>
+            <InputText id="project-description" value={description} onChange={(e) => setDescription(e.target.value)} />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label htmlFor="project-location" className="font-semibold">Location</label>
+            <InputText id="project-location" value={location} onChange={(e) => setLocation(e.target.value)} />
+          </div>
         </div>
-      </form>
-    </Modal>
+      </Panel>
+
+      <div className="flex justify-end gap-2">
+        <Button type="button" label="Cancel" className="p-button-text" onClick={() => dialogRef.close()} />
+        <Button type="submit" label="Save" disabled={invalid} />
+      </div>
+    </form>
   );
 }

@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { API_BASE_URL } from "../lib/env";
+import { Button, Card, Message, Password } from "../components/prime";
 
 /**
- * Closes a gap found during migration research: the ASP.NET server's password-reset
- * email always linked straight to the POST-only API endpoint, and no Angular page
- * ever consumed it. This page is what the reset email now actually links to.
+ * The original Angular app has no reset page; this is what the server's reset email links to.
+ * Styled after the original forgot-password page (same card/layout/components).
  */
 export function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -14,19 +14,27 @@ export function ResetPassword() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
   const [success, setSuccess] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    setError(null);
+    setErrorMessage("");
 
     if (!token) {
-      setError("This reset link is missing its token. Request a new one.");
+      setErrorMessage("This reset link is missing its token. Request a new one.");
+      return;
+    }
+    if (!newPassword) {
+      setErrorMessage("Password is required.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setErrorMessage("Password must be at least 8 characters.");
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError("Passwords do not match.");
+      setErrorMessage("Passwords do not match.");
       return;
     }
 
@@ -39,68 +47,51 @@ export function ResetPassword() {
       });
       const text = await res.text();
       if (!res.ok) {
-        setError(text || "Invalid or expired token");
+        setErrorMessage(text || "Invalid or expired token");
         return;
       }
       setSuccess(true);
     } catch {
-      setError("Something went wrong. Please try again.");
+      setErrorMessage("Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
-      <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-6 text-xl font-semibold text-neutral-900">Set a new password</h1>
+    <div className="min-h-screen w-full flex items-center justify-center surface-ground p-4">
+      <Card
+        className="w-full max-w-md content-background"
+        titleTemplate={
+          <div className="text-center">
+            <div className="text-xl font-semibold">Reset Password</div>
+            <div className="text-sm text-surface-500">Choose a new password</div>
+          </div>
+        }
+      >
+        <form noValidate className="flex flex-col gap-4" onSubmit={submit}>
+          {!success && (
+            <>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium" htmlFor="reset-password">New password</label>
+                <Password inputId="reset-password" value={newPassword} onChange={setNewPassword} feedback={false} toggleMask className="w-full" inputStyleClass="w-full" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium" htmlFor="reset-confirm">Confirm new password</label>
+                <Password inputId="reset-confirm" value={confirmPassword} onChange={setConfirmPassword} feedback={false} toggleMask className="w-full" inputStyleClass="w-full" />
+              </div>
+              <Button type="submit" label="Update Password" loading={submitting} disabled={submitting} className="w-full" />
+            </>
+          )}
 
-        {success ? (
-          <>
-            <p className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-700">
-              Your password has been updated.
-            </p>
-            <Link to="/login" className="mt-4 block text-center text-sm text-indigo-600 hover:underline">
-              Sign in
-            </Link>
-          </>
-        ) : (
-          <>
-            {error && <p className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-            <form className="space-y-4" onSubmit={submit}>
-              <label className="block text-sm font-medium text-neutral-700">
-                New password
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-indigo-500 focus:outline-none"
-                />
-              </label>
-              <label className="block text-sm font-medium text-neutral-700">
-                Confirm new password
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-indigo-500 focus:outline-none"
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
-              >
-                {submitting ? "Updating…" : "Update password"}
-              </button>
-            </form>
-          </>
-        )}
-      </div>
+          {success && <Message severity="success" text="Your password has been updated." />}
+          {errorMessage && <Message severity="error" text={errorMessage} />}
+
+          <div className="text-center text-sm">
+            <Link to="/login" className="underline">Back to sign in</Link>
+          </div>
+        </form>
+      </Card>
     </div>
   );
 }

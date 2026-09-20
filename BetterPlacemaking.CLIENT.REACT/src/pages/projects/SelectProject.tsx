@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { DataTable } from "../../components/prime";
 import * as projectApi from "../../services/projectApi";
 import type { ProjectDto } from "../../lib/projectTypes";
 
@@ -11,49 +12,52 @@ import type { ProjectDto } from "../../lib/projectTypes";
  */
 export function SelectProject() {
   const [projects, setProjects] = useState<ProjectDto[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     projectApi
       .getProjects()
-      .then(setProjects)
-      .finally(() => setLoading(false));
+      .then((p) => setProjects(p ?? []))
+      .catch(() => {});
   }, []);
 
   return (
-    <div>
-      <h1 className="text-xl font-semibold text-neutral-900">Your Projects</h1>
-
-      {loading ? (
-        <p className="mt-4 text-sm text-neutral-600">Loading…</p>
-      ) : projects.length === 0 ? (
-        <p className="mt-4 text-sm text-neutral-600">No projects assigned.</p>
-      ) : (
-        <table className="mt-4 w-full overflow-hidden rounded-lg border border-neutral-200 bg-white text-sm">
-          <thead className="bg-neutral-100 text-left text-neutral-700">
-            <tr>
-              <th className="px-4 py-2 font-medium">Title</th>
-              <th className="px-4 py-2 font-medium">Description</th>
-              <th className="px-4 py-2 font-medium">Location</th>
-              <th className="px-4 py-2 font-medium" />
-            </tr>
-          </thead>
-          <tbody>
-            {projects.map((project) => (
-              <tr key={project.Id} className="border-t border-neutral-100">
-                <td className="px-4 py-2 text-neutral-900">{project.Title}</td>
-                <td className="px-4 py-2 text-neutral-600">{project.Description}</td>
-                <td className="px-4 py-2 text-neutral-600">{project.Location}</td>
-                <td className="px-4 py-2 text-right">
-                  <Link to={`/${project.Id}`} className="text-indigo-600 hover:underline">
-                    Open
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+    <div className="w-full flex flex-col content-background rounded-lg">
+      <DataTable
+        value={projects}
+        className="rounded-lg overflow-hidden"
+        caption={
+          <div className="w-full flex justify-between items-center">
+            <div className="gap-3">
+              <span className="font-semibold text-xl">Projects</span>
+            </div>
+          </div>
+        }
+        headerTemplate={() => (
+          <tr>
+            <th>Title</th>
+            <th>Description</th>
+            <th>Location</th>
+            <th>Action</th>
+          </tr>
+        )}
+        bodyTemplate={(project: ProjectDto) => (
+          <tr>
+            <td>{project.Title}</td>
+            <td>{project.Description}</td>
+            <td>{project.Location}</td>
+            <td>
+              <Link to={`/${project.Id}`} className="p-button p-component p-button-sm p-button-outlined">
+                Open
+              </Link>
+            </td>
+          </tr>
+        )}
+        emptyMessage={
+          <tr>
+            <td colSpan={4}>No projects assigned.</td>
+          </tr>
+        }
+      />
     </div>
   );
 }

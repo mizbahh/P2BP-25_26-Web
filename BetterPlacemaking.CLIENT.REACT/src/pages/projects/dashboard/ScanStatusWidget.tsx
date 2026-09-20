@@ -1,4 +1,5 @@
 import { HasPermission } from "../../../auth/HasPermission";
+import { Button } from "../../../components/prime";
 import { Permissions } from "../../../lib/permissions";
 
 interface ScanStatusWidgetProps {
@@ -12,13 +13,14 @@ interface ScanStatusWidgetProps {
   onRunFullScan: () => void;
 }
 
-/** Mirrors the Angular ScanStatusWidget. Backed by ScanService (scanApi.getScans/startScan
- * against /api/scan, an already-ported and mounted Express resource) plus the LiDAR device list
- * from deviceApi - real data, no stub. The "Last Scan" panel links to the project's 3D model
- * page (`/:projectId/model`); that Visualizer route isn't wired into the React app yet since the
- * Fusion/Visualizer pipeline hasn't been ported to the Express backend, so this link will not
- * resolve to anything until that page exists - preserved as-is to match the old Angular
- * behavior, same as its own "Project.Scans.Read"-gated `model` route being unported here. */
+const AppScanStatusWidget = "app-scan-status-widget" as unknown as "div";
+
+/** en-US Date.prototype.toLocaleString() (what the Angular template prints). */
+function toLocale(d: Date): string {
+  return d.toLocaleString();
+}
+
+/** Mirrors the Angular ScanStatusWidget. */
 export function ScanStatusWidget({
   lastScanTime,
   formatTimeAgo,
@@ -30,50 +32,44 @@ export function ScanStatusWidget({
   onRunFullScan,
 }: ScanStatusWidgetProps) {
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
-      <div className="mb-4 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onOpenModelPage}
-          className="text-left text-lg font-semibold text-neutral-900 hover:underline"
-        >
-          Last Scan
-        </button>
-        <button
-          type="button"
-          onClick={onRefresh}
-          aria-label="Refresh"
-          className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
-        >
-          ⟳
-        </button>
-      </div>
-
-      <div className="flex cursor-pointer flex-col items-center justify-center py-4 text-center" onClick={onOpenModelPage}>
-        <div className="mb-2 text-3xl font-bold text-neutral-900">{formatTimeAgo(lastScanTime)}</div>
-        <div className="text-sm text-neutral-500">Last completed scan</div>
-        {lastScanTime.getTime() > 0 && (
-          <div className="mt-2 text-xs text-neutral-400">{lastScanTime.toLocaleString()}</div>
-        )}
-      </div>
-
-      <div className="mt-4">
-        <HasPermission permission={Permissions.Project.ScansStart} projectId={projectId}>
-          <button
-            type="button"
-            onClick={onRunFullScan}
-            disabled={scanLoading}
-            className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {scanLoading ? "Starting scan…" : "Run Full Scan"}
+    <AppScanStatusWidget>
+      <div className="card bg-surface-0 dark:bg-surface-900 shadow-sm rounded-xl border border-surface-300 dark:border-surface-700 p-6 bg-black">
+        <div className="flex items-center justify-between mb-6">
+          <button type="button" className="text-xl font-semibold text-left hover:underline" onClick={onOpenModelPage}>
+            Last Scan
           </button>
-        </HasPermission>
-        {scanMessage && (
-          <p className={`mt-2 text-center text-sm ${scanMessage.toLowerCase().includes("failed") ? "text-red-600" : "text-emerald-600"}`}>
-            {scanMessage}
-          </p>
-        )}
+
+          <Button icon="pi pi-refresh" text rounded onClick={onRefresh} />
+        </div>
+
+        <div className="flex-grow flex flex-col items-center justify-center cursor-pointer" onClick={onOpenModelPage}>
+          <div className="text-center mb-6">
+            <i className="pi pi-clock text-6xl text-blue-500 mb-4"></i>
+            <div className="text-4xl font-bold mb-2">{formatTimeAgo(lastScanTime)}</div>
+            <div className="text-gray-600">Last completed scan</div>
+          </div>
+
+          <div className="text-sm">{toLocale(lastScanTime)}</div>
+        </div>
+
+        <div className="mt-6">
+          <HasPermission permission={Permissions.Project.ScansStart} projectId={projectId}>
+            <Button
+              label="Run Full Scan"
+              icon="pi pi-search"
+              className="w-full"
+              loading={scanLoading}
+              disabled={scanLoading}
+              onClick={onRunFullScan}
+            />
+          </HasPermission>
+          {scanMessage && (
+            <div className={"mt-2 text-center text-sm " + (scanMessage.includes("Failed") ? "text-red-500" : "text-green-600")}>
+              {scanMessage}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </AppScanStatusWidget>
   );
 }

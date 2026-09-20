@@ -1,3 +1,4 @@
+import { Button } from "../../../components/prime";
 import type { DeviceCounts, ProjectViewModel } from "../../../lib/dashboardTypes";
 
 interface ProjectChecklistWidgetProps {
@@ -9,21 +10,12 @@ interface ProjectChecklistWidgetProps {
   onWarningsResolvedClick: () => void;
 }
 
-function ChecklistRow({ label, done, onClick }: { label: string; done: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-center justify-between rounded px-2 py-2 text-left transition hover:bg-neutral-50"
-    >
-      <span className="text-neutral-700">{label}</span>
-      <span className={`font-medium ${done ? "text-emerald-600" : "text-neutral-500"}`}>{done ? "Yes" : "No"}</span>
-    </button>
-  );
-}
+const AppProjectChecklistWidget = "app-project-checklist-widget" as unknown as "div";
 
-/** Mirrors the Angular ProjectChecklistWidget. Purely derived from ProjectService + DeviceService
- * data already fetched by Dashboard.tsx - real data, no stub. */
+const ROW =
+  "w-full flex justify-between items-center border-b border-surface-200 dark:border-surface-700 pb-2 text-left hover:bg-surface-50 dark:hover:bg-surface-800 rounded px-2 py-2 transition";
+
+/** Mirrors the Angular ProjectChecklistWidget. */
 export function ProjectChecklistWidget({
   project,
   deviceCounts,
@@ -33,41 +25,45 @@ export function ProjectChecklistWidget({
   onWarningsResolvedClick,
 }: ProjectChecklistWidgetProps) {
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-neutral-900">Project Checklist</h3>
-        <button
-          type="button"
-          onClick={onRefresh}
-          aria-label="Refresh"
-          className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
-        >
-          ⟳
-        </button>
-      </div>
-
-      <div className="mb-4">
-        <div className="text-base font-semibold text-neutral-900">{project.title}</div>
-        <div className="mt-1 text-sm text-neutral-500">{project.description}</div>
-      </div>
-
-      {project.checklistMessage && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
-          {project.checklistMessage}
+    <AppProjectChecklistWidget>
+      <div className="card bg-surface-0 dark:bg-surface-900 shadow-sm rounded-xl border border-surface-300 dark:border-surface-700 p-6 bg-black">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-semibold">Project Checklist</h3>
+          <Button icon="pi pi-refresh" text rounded onClick={onRefresh} />
         </div>
-      )}
 
-      <div className="divide-y divide-neutral-100 border-b border-neutral-100">
-        <ChecklistRow label="Devices added" done={deviceCounts.total > 0} onClick={onDevicesAddedClick} />
-        <ChecklistRow label="Offline devices fixed" done={deviceCounts.offline === 0} onClick={onOfflineDevicesFixedClick} />
-        <ChecklistRow label="Warnings resolved" done={deviceCounts.warning === 0} onClick={onWarningsResolvedClick} />
+        <div className="mb-4">
+          <div className="text-lg font-semibold">{project.title}</div>
+          <div className="text-sm text-muted-color mt-1">{project.description}</div>
+        </div>
+
+        <div className="mb-4 p-3 rounded-lg bg-surface-50 dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
+          <div className="text-sm font-medium mb-2">Current Status</div>
+          {project.checklistMessage && <div className="text-sm text-orange-600">{project.checklistMessage}</div>}
+        </div>
+
+        <div className="space-y-3">
+          <button type="button" className={ROW} onClick={onDevicesAddedClick}>
+            <span>Devices added</span>
+            <span className="font-medium">{deviceCounts.total > 0 ? "Yes" : "No"}</span>
+          </button>
+
+          <button type="button" className={ROW} onClick={onOfflineDevicesFixedClick}>
+            <span>Offline devices fixed</span>
+            <span className="font-medium">{deviceCounts.offline === 0 ? "Yes" : "No"}</span>
+          </button>
+
+          <button type="button" className={ROW} onClick={onWarningsResolvedClick}>
+            <span>Warnings resolved</span>
+            <span className="font-medium">{deviceCounts.warning === 0 ? "Yes" : "No"}</span>
+          </button>
+
+          <div className="flex justify-between items-center px-2 py-2">
+            <span>Project ready</span>
+            <span className="font-medium">{project.progress === 100 ? "Yes" : "No"}</span>
+          </div>
+        </div>
       </div>
-      <div className="flex items-center justify-between px-2 py-2">
-        <span className="text-neutral-700">Project ready</span>
-        <span className={`font-medium ${project.progress === 100 ? "text-emerald-600" : "text-neutral-500"}`}>
-          {project.progress === 100 ? "Yes" : "No"}
-        </span>
-      </div>
-    </div>
+    </AppProjectChecklistWidget>
   );
 }

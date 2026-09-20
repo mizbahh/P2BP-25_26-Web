@@ -1,5 +1,6 @@
 import type { DeviceDto } from "../../../lib/deviceTypes";
 import type { DeviceStatus } from "../../../lib/dashboardTypes";
+import { Button } from "../../../components/prime";
 
 interface DevicesWidgetProps {
   devices: DeviceDto[];
@@ -11,14 +12,18 @@ interface DevicesWidgetProps {
   onOpenDevicesPage: () => void;
 }
 
-const STATUS_DOT: Record<DeviceStatus, string> = {
-  online: "bg-emerald-500",
-  offline: "bg-red-500",
-  warning: "bg-amber-500",
-};
+const AppDevicesWidget = "app-devices-widget" as unknown as "div";
 
-/** Mirrors the Angular DevicesWidget. Backed by DeviceService.getDevicesByProject
- * (deviceApi.getDevicesByProject), an already-ported Express resource - real data, no stub. */
+function getStatusColor(status: string): string {
+  const colors: Record<string, string> = {
+    online: "bg-green-500",
+    offline: "bg-red-500",
+    warning: "bg-yellow-500",
+  };
+  return colors[status] || "bg-gray-400";
+}
+
+/** Mirrors the Angular DevicesWidget. */
 export function DevicesWidget({
   devices,
   loading,
@@ -29,54 +34,55 @@ export function DevicesWidget({
   onOpenDevicesPage,
 }: DevicesWidgetProps) {
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
-      <div className="mb-4 flex items-start justify-between">
-        <div>
-          <button
-            type="button"
-            onClick={onOpenDevicesPage}
-            className="text-left text-lg font-semibold text-neutral-900 hover:underline"
-          >
-            Device Status
-          </button>
-          <div className="mt-1 text-xs text-neutral-500">Showing all devices assigned to this project.</div>
-        </div>
-        <button
-          type="button"
-          onClick={onRefresh}
-          aria-label="Refresh"
-          className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
-        >
-          ⟳
-        </button>
-      </div>
+    <AppDevicesWidget>
+      <div className="card bg-surface-0 dark:bg-surface-900 shadow-sm rounded-xl border border-surface-300 dark:border-surface-700 p-6 bg-black">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <button type="button" className="text-xl font-semibold text-left hover:underline" onClick={onOpenDevicesPage}>
+              Device Status
+            </button>
 
-      {loading && <p className="text-sm text-neutral-500">Loading devices…</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {!loading && !error && devices.length === 0 && (
-        <p className="text-sm text-neutral-500">No devices are assigned yet.</p>
-      )}
-
-      {devices.length > 0 && (
-        <div className="max-h-96 space-y-1 overflow-y-auto pr-1">
-          {devices.map((device) => (
-            <div
-              key={device.Id}
-              className="flex items-center justify-between border-b border-neutral-100 py-2 last:border-0"
-            >
-              <div className="flex items-center">
-                <span className={`mr-3 h-2.5 w-2.5 flex-shrink-0 rounded-full ${STATUS_DOT[getDeviceStatus(device)]}`} />
-                <div>
-                  <div className="font-medium text-neutral-900">{device.Name}</div>
-                  <div className="text-xs text-neutral-500">Resolution: {device.Config?.Camera?.Resolution ?? "N/A"}</div>
-                  <div className="text-xs text-neutral-500">Version: {device.Config?.Version ?? "Unknown"}</div>
-                </div>
-              </div>
-              <div className="text-xs text-neutral-500">Last seen: {getDeviceLastSeen(device)}</div>
+            <div className="text-xs text-gray-500 mt-1">
+              Showing all devices temporarily until devices are assigned under projects.
             </div>
-          ))}
+          </div>
+
+          <Button icon="pi pi-refresh" text rounded onClick={onRefresh} />
         </div>
-      )}
-    </div>
+
+        {loading && <div className="text-sm text-gray-500">Loading devices...</div>}
+
+        {error && <div className="text-sm text-red-500">{error}</div>}
+
+        {!loading && !error && devices.length === 0 && (
+          <div className="text-sm text-gray-500">No devices are assigned yet.</div>
+        )}
+
+        {devices.length > 0 && (
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+            {devices.map((device) => (
+              <div
+                key={device.Id}
+                className="flex items-center justify-between p-2 border-b border-surface-200 dark:border-surface-700"
+              >
+                <div className="flex items-center">
+                  <span className={"w-3 h-3 rounded-full mr-3 " + getStatusColor(getDeviceStatus(device))}></span>
+
+                  <div>
+                    <div className="font-medium">{device.Name}</div>
+                    <div className="text-sm text-muted-color">
+                      Resolution: {device.Config?.Camera?.Resolution ?? "N/A"}
+                    </div>
+                    <div className="text-sm text-muted-color">Version: {device.Config?.Version ?? "Unknown"}</div>
+                  </div>
+                </div>
+
+                <div className="text-sm text-muted-color">Last seen: {getDeviceLastSeen(device)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </AppDevicesWidget>
   );
 }

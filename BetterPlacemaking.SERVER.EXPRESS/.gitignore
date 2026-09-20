@@ -6,3 +6,6 @@ service-account.json
 
 # The root .gitignore excludes .env* broadly; this template has no secrets in it.
 !.env.example
+
+# Local Firestore emulator data (demo/reference seed) - dev only
+.emulator-data/
